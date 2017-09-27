@@ -500,12 +500,12 @@ int showip(int argc, char **argv) {
       return 0;
     }
     Serial.println(Ethernet.localIP());
-  } else if (argc < 4) {
+  } else if (argc == 4) {
     unsigned int tmp;
     int i;
     ip_address_tmp = 0;
     for (i=0;i<4;i++) {
-      tmp = strtoul(argv[i], NULL, 0);
+      tmp = strtoul(argv[3-i], NULL, 0);
       if (tmp < 256) {
         ip_address_tmp = ip_address_tmp << 8;
         ip_address_tmp = ip_address_tmp | tmp;
@@ -527,6 +527,9 @@ int showip(int argc, char **argv) {
       Serial.println("Non-DHCP mode selected! This is a warning!");
       Serial.println("Check it before you reset!");      
     }    
+  } else {
+    Serial.println("ip needs 4 octets less than 256");
+    return 0;
   }
   return 0;
 }
