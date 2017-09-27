@@ -95,7 +95,7 @@ const char *cmd_unrecog = "Unknown command.";
 #define MSP430_TEST        11
 
 char boardID[9];
-#define VERSION "v0.7-alpha0"
+#define VERSION "v0.7"
 
 SerialServer *bridgeSerial = NULL;
 unsigned char bridgeExitMatch = 0;
