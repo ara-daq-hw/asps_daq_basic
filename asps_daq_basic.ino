@@ -3,6 +3,7 @@
 #include <TivaTwoWire.h>  
 #include <Cmd.h>
 #include <Ethernet.h>
+#include <EthernetUdp.h>
 #include <EthernetBootloader.h>
 #include "driverlib/watchdog.h"
 #include "driverlib/rom_map.h"
@@ -15,7 +16,52 @@
 #include "inc/hw_flash.h"
 #include "driverlib/sysctl.h"
 #include "driverlib/interrupt.h"
+/*
+#include "lwip/igmp.h"
 
+class IGMP {
+public:
+  IGMP(char *netif) : _ifname(netif) {}
+  void begin() {
+     struct netif *iface;
+     igmp_init();
+     iface = netif_find(_ifname);
+     if (iface == NULL) {
+       Serial.println("IGMP: can't find interface");
+       return;
+     }
+     igmp_start(iface);
+     Serial.println("IGMP: IGMP started");
+  }
+  void end() {
+    struct netif *iface;
+    iface = netif_find(_ifname);
+    if (iface != NULL) igmp_stop(iface);
+  }
+  void join(uint32_t a, uint32_t b, uint32_t c, uint32_t d) {
+    struct netif *iface;
+    ip_addr_t group;
+    IP4_ADDR(&group, a, b, c, d);
+    iface = netif_find(_ifname);
+    if (iface == NULL) return;
+    igmp_joingroup(&iface->ip_addr, &group);
+    Serial.print("IGMP: joined group ");
+    Serial.print(a);
+    Serial.print(".");
+    Serial.print(b);
+    Serial.print(".");
+    Serial.print(c);
+    Serial.print(".");
+    Serial.println(d);
+  }
+private:
+  char *_ifname;
+};
+
+IGMP igmp0("ti0");
+EthernetUDP ptpEvent;
+EthernetUDP ptpGeneral;
+*/
 bool feedWatchdog;
 
 void defaultPage(WebServer &server, WebServer::ConnectionType type, char *url_tail, bool tail_complete);
@@ -35,6 +81,7 @@ const char *cmd_unrecog = "Unknown command.";
 
 #define ASPSDAQ_BOARD_ID_ADDRESS 0
 #define ASPSDAQ_IP_ADDRESS 8
+#define ASPSDAQ_DEFAULT_SERVICES 12
 
 // Enable TIVA <-> Heater BSL comms pin (inverted)
 #define TIVA_EN_BSL_B      58
@@ -48,7 +95,7 @@ const char *cmd_unrecog = "Unknown command.";
 #define MSP430_TEST        11
 
 char boardID[9];
-#define VERSION "v0.6.1"
+#define VERSION "v0.7-alpha0"
 
 SerialServer *bridgeSerial = NULL;
 unsigned char bridgeExitMatch = 0;
@@ -62,11 +109,17 @@ typedef enum {
 } EthernetState;
 
 EthernetState eState;
+// These are the services available.
+// The Ethernet Bootloader always is running. The others can be started
+// later if the defaults are configured right.
 EthernetBootloader boot;
 SerialServer ser1(23, 1);
+bool ser1EvenParity = false;
 SerialServer ser4(24, 4);
+bool ser4EvenParity = false;
 SerialServer ser5(25, 5);
 SerialServer ser7(26, 7);
+WebServer webServer("", 80);
 
 #define SENSOR_UPDATE_PERIOD 1000
 unsigned long sensorUpdateTime = 0;
@@ -105,7 +158,6 @@ typedef struct {
 } Sensors;
 Sensors curSensors;
 
-WebServer webServer("", 80);
 
 void setup() {
   uint32_t user0, user1;
@@ -255,7 +307,10 @@ void bslReset(bool heater, bool bsl) {
       digitalWrite(ASPSPWR_RX, 1);
       pinMode(ASPSPWR_RX, INPUT);
       pinMode(RST_ASPS_PWR_B, INPUT_PULLUP);
-      Serial4.begin(9600);
+      if (ser4EvenParity)
+        Serial4.begin(9600, 2);
+      else
+        Serial4.begin(9600);
     }
   } else {
     if (!bsl) {
@@ -726,12 +781,28 @@ void loop() {
     }
   }
   if (eState == ETHERNET_READY) {
+    int packetSize;
+    
     boot.handle();
     webServer.processConnection();
+//    packetSize = ptpEvent.parsePacket();
+//    if (packetSize) {
+//      Serial.print("ptpEvent: ");
+//      Serial.println(packetSize);
+//    }
+//    packetSize = ptpGeneral.parsePacket();
+//    if (packetSize) {
+//      Serial.print("ptpGeneral: ");
+//      Serial.println(packetSize);
+//    }
   }
 }
 
 void beginEthernet() {
+//  igmp0.begin();
+//  igmp0.join(224, 0, 1, 129);
+//  ptpEvent.begin(319);
+//  ptpGeneral.begin(320);
   boot.begin();
   webServer.begin();
   webServer.addCommand("index.html", &defaultPage);
@@ -798,12 +869,16 @@ void serialPage(WebServer &server, WebServer::ConnectionType type, char *url_tai
                           "<body>"
                           "<h1>ASPS-DAQ Serial Status Page</h1>"
                           "<br>";
-  const char *endPage = "<form action=\"serial.html\" method=\"get\">"
-                        "<input type=\"checkbox\" name=\"dis\" value=\"0\">Port 23<br>"
-                        "<input type=\"checkbox\" name=\"dis\" value=\"1\">Port 24<br>"
-                        "<input type=\"checkbox\" name=\"dis\" value=\"2\">Port 25<br>"
-                        "<input type=\"checkbox\" name=\"dis\" value=\"3\">Port 26<br>"
-                        "<input type=\"submit\" value=\"Disconnect\"></form></body></html>";  
+  const char *endPage1 = "<form action=\"serial.html\" method=\"get\">"
+                        "Port 23: <input type=\"checkbox\" name=\"dis\" value=\"0\">Disconnect<input type=\"radio\" name=\"par0\" value=\"0\"";
+  const char *endPage2 = "No Parity<input type=\"radio\" name=\"par0\" value=\"1\"";
+  const char *endPage3 = "Even Parity<br>"
+                         "Port 24: <input type=\"checkbox\" name=\"dis\" value=\"1\">Disconnect<input type=\"radio\" name=\"par1\" value=\"0\"";
+  const char *endPage4 = "No Parity<input type=\"radio\" name=\"par1\" value=\"1\"";
+  const char *endPage5 = "Even Parity<br>"
+                         "Port 25: <input type=\"checkbox\" name=\"dis\" value=\"2\">Disconnect<br>"
+                         "Port 26: <input type=\"checkbox\" name=\"dis\" value=\"3\">Disconnect<br>"
+                         "<input type=\"submit\" value=\"Modify\"></form></body></html>";
   URLPARAM_RESULT rc;
 
   server.httpSuccess();
@@ -821,6 +896,38 @@ void serialPage(WebServer &server, WebServer::ConnectionType type, char *url_tai
             default: break;
           }
         }
+        if (!strcmp("par0", name)) {
+          switch(atoi(value)) {
+            case 0: if (ser1EvenParity) {
+              Serial1.end();
+              Serial1.begin(9600);
+              ser1EvenParity = false;
+              break;
+            } else break;
+            case 1: if (!ser1EvenParity) {
+              Serial1.end();
+              Serial1.begin(9600, 2);
+              ser1EvenParity = true;
+              break;
+            } else break;
+          }
+        }
+        if (!strcmp("par1", name)) {
+          switch(atoi(value)) {
+            case 0: if (ser4EvenParity) {
+              Serial4.end();
+              Serial4.begin(9600);
+              ser4EvenParity = false;
+              break;
+            } else break;
+            case 1: if (!ser4EvenParity) {
+              Serial4.end();
+              Serial4.begin(9600, 2);
+              ser4EvenParity = true;
+              break;
+            } else break;
+          }
+        }        
       }
     }
   }
@@ -842,7 +949,19 @@ void serialPage(WebServer &server, WebServer::ConnectionType type, char *url_tai
   if (!ser7.connected()) server.print("NOT ");
   server.print("CONNECTED</p>");
   
-  server.print(endPage);
+  server.print(endPage1);
+  if (ser1EvenParity) server.print(">");
+  else server.print(" checked>");
+  server.print(endPage2);
+  if (ser1EvenParity) server.print(" checked>");
+  else server.print(">");
+  server.print(endPage3);
+  if (ser4EvenParity) server.print(">");
+  else server.print(" checked>");
+  server.print(endPage4);
+  if (ser4EvenParity) server.print(" checked>");
+  else server.print(">");
+  server.print(endPage5);
 }
 
 const char *output_labels[5] = {
