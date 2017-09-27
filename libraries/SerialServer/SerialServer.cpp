@@ -75,15 +75,18 @@ void SerialServer::handleEthernet() {
       _state = state_IDLE;
     case state_IDLE:
       if (inb == TELNET_IAC) _state = state_IAC;
-      serial->write(inb);
-      space--;
+	  else {
+	  	serial->write(inb);
+	    space--;
+	  }
       break;
     case state_IAC:
       if (inb == TELNET_IAC) {
-	serial->write(inb);
-	space--;
-	break;
-      }
+		serial->write(inb);
+		space--;
+		_state = state_IDLE;
+		break;
+     }
       if (inb == TELNET_SB){
 	_state = state_IAC_SB;
 	break;
