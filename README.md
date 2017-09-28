@@ -3,6 +3,8 @@ ASPS-DAQ firmware.
 Used libraries are under libraries/. You'll probably need to move them to the
 libraries directory for your Energia install.
 
+Note that this has submodules, so you need to clone recursively. `git clone --recursive https://github.com/ara-daq-hw/asps_daq_basic.git`
+
 When the uC is unprogrammed, it's in bootloader mode, so you can just use LM Flash Programmer using the serial
 connection and it will program OK. After it's programmed, give it a MAC address (don't screw up! It's a one-time
 program, for the most part). After that it can connect to the network, and the Ethernet bootloader will work.
