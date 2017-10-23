@@ -1,7 +1,9 @@
 ASPS-DAQ firmware.
 
 Used libraries are under libraries/. You'll probably need to move them to the
-libraries directory for your Energia install.
+libraries directory for your Energia install OR you can just create a symbolic link
+to the directory. I *seriously* recommend creating a symbolic link. On Windows this can
+be done with the "mklink" command in the command prompt. 
 
 Note that this has submodules, so you need to clone recursively. `git clone --recursive https://github.com/ara-daq-hw/asps_daq_basic.git`
 
