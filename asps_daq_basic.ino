@@ -16,8 +16,8 @@
 #include "inc/hw_flash.h"
 #include "driverlib/sysctl.h"
 #include "driverlib/interrupt.h"
-/*
 #include "lwip/igmp.h"
+#include "ArduinoPTP.h"
 
 class IGMP {
 public:
@@ -38,13 +38,22 @@ public:
     iface = netif_find(_ifname);
     if (iface != NULL) igmp_stop(iface);
   }
-  void join(uint32_t a, uint32_t b, uint32_t c, uint32_t d) {
+  int join(uint32_t a, uint32_t b, uint32_t c, uint32_t d) {
     struct netif *iface;
     ip_addr_t group;
+    err_t err;
     IP4_ADDR(&group, a, b, c, d);
     iface = netif_find(_ifname);
-    if (iface == NULL) return;
-    igmp_joingroup(&iface->ip_addr, &group);
+    if (iface == NULL) {
+      Serial.println("IGMP: no interface found");
+      return -1;
+    }
+    if ((err = igmp_joingroup(&iface->ip_addr, &group)) != ERR_OK) {
+      Serial.print("IGMP: error ");
+      Serial.print(err);
+      Serial.println(" joining group");
+      return err;
+    }
     Serial.print("IGMP: joined group ");
     Serial.print(a);
     Serial.print(".");
@@ -53,15 +62,16 @@ public:
     Serial.print(c);
     Serial.print(".");
     Serial.println(d);
+    return 0;
   }
 private:
   char *_ifname;
 };
 
 IGMP igmp0("ti0");
-EthernetUDP ptpEvent;
-EthernetUDP ptpGeneral;
-*/
+ArduinoPTP ptp0;
+bool ptpRunning;
+
 bool feedWatchdog;
 
 void defaultPage(WebServer &server, WebServer::ConnectionType type, char *url_tail, bool tail_complete);
@@ -95,7 +105,7 @@ const char *cmd_unrecog = "Unknown command.";
 #define MSP430_TEST        11
 
 char boardID[9];
-#define VERSION "v0.7"
+#define VERSION "v0.8-alpha0"
 
 SerialServer *bridgeSerial = NULL;
 unsigned char bridgeExitMatch = 0;
@@ -262,6 +272,7 @@ void setup() {
   cmdAdd("bsl", doBsl);
   cmdAdd("reboot", doReboot);
   cmdAdd("loop",doLoop);
+  cmdAdd("ptp",doPtp);
   analogRead(TEMPSENSOR);
   Wire.begin();
 
@@ -277,6 +288,8 @@ void setup() {
   WatchdogIntRegister(WATCHDOG0_BASE, &WatchdogIntHandler);
   // Enable the watchdog
   MAP_WatchdogEnable(WATCHDOG0_BASE);
+
+  ptpRunning = false;
 }
 
 void bslReset(bool heater, bool bsl) {
@@ -788,24 +801,12 @@ void loop() {
     
     boot.handle();
     webServer.processConnection();
-//    packetSize = ptpEvent.parsePacket();
-//    if (packetSize) {
-//      Serial.print("ptpEvent: ");
-//      Serial.println(packetSize);
-//    }
-//    packetSize = ptpGeneral.parsePacket();
-//    if (packetSize) {
-//      Serial.print("ptpGeneral: ");
-//      Serial.println(packetSize);
-//    }
+
+    if (ptpRunning) ptp0.handle();
   }
 }
 
 void beginEthernet() {
-//  igmp0.begin();
-//  igmp0.join(224, 0, 1, 129);
-//  ptpEvent.begin(319);
-//  ptpGeneral.begin(320);
   boot.begin();
   webServer.begin();
   webServer.addCommand("index.html", &defaultPage);
@@ -1050,8 +1051,32 @@ void defaultPage(WebServer &server, WebServer::ConnectionType type, char *url_ta
   server.print(endPage);
 }
 
+int doPtp(int argc, char **argv) {
+  int startStop;
+  
+  argc--;
+  argv++;
+  if (!argc) {
+      Serial.println("ptp needs 0 or 1, to start/stop ptpd");
+      return 0;
+  }
+  startStop = atoi(*argv);
+  if (startStop) {
+    igmp0.begin();
+    igmp0.join(224, 0, 1, 129);
+    ptp0.begin();
+    ptpRunning = true;
+  } else {
+    ptp0.stop();
+    igmp0.end();
+    ptpRunning = false;
+  }
+  return 0;
+}
+
 void WatchdogIntHandler(void) {
   if (!feedWatchdog) return;
   feedWatchdog = false;
   WatchdogIntClear(WATCHDOG0_BASE);  
 }
+
