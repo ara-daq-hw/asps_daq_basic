@@ -13,6 +13,8 @@ public:
 	uint8_t begin();
 	void stop();
 	void handle();
+	typedef struct _PTPMsg PTPMsg;
+      
 private:
 	EthernetUDP _general;
 	EthernetUDP _event;
