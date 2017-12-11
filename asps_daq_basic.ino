@@ -133,6 +133,9 @@ const unsigned char currentPins[5] =  { 68, 26, 2, 6, 87 };
 const unsigned char faultPins[5] = {67,55,44,52,43};
 const unsigned char onPins[5] = {47,7,15,42,14};
 unsigned char onState[5];
+const unsigned char TIVA_GREEN = 45;
+const unsigned char TIVA_RED = 46;
+
 
 typedef enum {
   SENSOR_STATE_ADC0 = 0,
@@ -210,6 +213,7 @@ void setup() {
     Serial.print("BOOTCFG up-to-date: ");
     Serial.println(tmp, HEX);
   }
+
   // print out the Ethernet MAC
   getMacAddress(0, NULL);
   ROM_FlashUserGet(&user0, &user1);
@@ -222,7 +226,10 @@ void setup() {
       eState = ETHERNET_STARTED_WAIT_DHCP;
     } else {
       Ethernet.begin(ip_address);
-      eState = ETHERNET_READY;
+      eState = ETHERNET_READY;  
+      //enable pin 46 LED to mark the coming alive of the Ethernet
+      pinMode(TIVA_RED, OUTPUT);
+      digitalWrite(TIVA_RED, 0);
       beginEthernet();
     }
     Ethernet.enableLinkLed();
@@ -277,6 +284,10 @@ void setup() {
   WatchdogIntRegister(WATCHDOG0_BASE, &WatchdogIntHandler);
   // Enable the watchdog
   MAP_WatchdogEnable(WATCHDOG0_BASE);
+  
+  //enable pin 45 LED to mark the coming alive of the TIVA uC
+  pinMode(TIVA_GREEN,OUTPUT);
+  digitalWrite(TIVA_GREEN, 0);
 }
 
 void bslReset(bool heater, bool bsl) {
@@ -776,6 +787,9 @@ void loop() {
   if (eState == ETHERNET_STARTED_WAIT_DHCP) {
     if (Ethernet.ready()) {
       eState = ETHERNET_READY;
+      //enable pin 46 LED to mark the coming alive of the Ethernet
+      pinMode(TIVA_RED, OUTPUT);
+      digitalWrite(TIVA_RED, 0);
       if (bridgeSerial == NULL) {
         Serial.print("DHCP Complete: ");
         Serial.println(Ethernet.localIP());
