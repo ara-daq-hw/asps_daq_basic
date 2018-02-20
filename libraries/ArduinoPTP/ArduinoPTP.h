@@ -5,7 +5,8 @@
  * PTP packets, which requires joining IGMP group 224.0.1.129.
  */
  
- #include <EthernetUdp.h>
+ #include <EthernetUdpTimestamped.h>
+ #include "lwip/pbuf.h"
  
 class ArduinoPTP {
 public:
@@ -14,6 +15,6 @@ public:
 	void stop();
 	void handle();
 private:
-	EthernetUDP _general;
-	EthernetUDP _event;
+	EthernetUDPTimestamped _general;
+	EthernetUDPTimestamped _event;
 };

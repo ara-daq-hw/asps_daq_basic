@@ -4,6 +4,7 @@
 #include <Cmd.h>
 #include <Ethernet.h>
 #include <EthernetUdp.h>
+#include <EthernetUdpTimestamped.h>
 #include <EthernetBootloader.h>
 #include "driverlib/watchdog.h"
 #include "driverlib/rom_map.h"
