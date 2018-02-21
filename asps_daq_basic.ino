@@ -4,6 +4,7 @@
 #include <Cmd.h>
 #include <Ethernet.h>
 #include <EthernetUdp.h>
+#include <EthernetUdpTimestamped.h>
 #include <EthernetBootloader.h>
 #include "driverlib/watchdog.h"
 #include "driverlib/rom_map.h"
@@ -289,7 +290,7 @@ void setup() {
   // Enable the watchdog
   MAP_WatchdogEnable(WATCHDOG0_BASE);
 
-  ptpRunning = false;
+  ptpRunning = false; 
 }
 
 void bslReset(bool heater, bool bsl) {
