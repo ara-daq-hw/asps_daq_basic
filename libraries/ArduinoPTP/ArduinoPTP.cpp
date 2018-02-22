@@ -17,12 +17,15 @@ void ArduinoPTP::handle() {
 		// Do something to handle general packets.
 	}
 	packetSize = _event.parsePacket();
-	if  (packetSize && !npackets) {
+	if  (packetSize && npackets>=0) {
 		npackets++;
-		if (npackets == 10) npackets = 0;
+		if (npackets == 10) 
+		{
+			npackets = 0;
 		Serial.print("PTP event: ");
 		Serial.print(_event.getSeconds());
 		Serial.print(".");
 		Serial.print(_event.getNanoseconds());
+		}
 	}
 }
